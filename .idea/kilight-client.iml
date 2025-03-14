@@ -6,9 +6,9 @@
       <sourceFolder url="file://$MODULE_DIR$/tests" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/build" />
-      <excludeFolder url="file://$MODULE_DIR$/.venv/kilight_client" />
+      <excludeFolder url="file://$MODULE_DIR$/.venv/kilight-client" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.13 (kilight_client)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.13 (kilight-client)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>

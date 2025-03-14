@@ -1,5 +1,5 @@
 [project]
-name = "kilight_client"
+name = "kilight-client"
 version = "0.2.0"
 authors = [
     {name = "Patrick Lavigne", email = "me@patrick.codes"},
@@ -19,7 +19,7 @@ dependencies = [
 dynamic = ["readme"]
 
 [project.urls]
-repository = "https://github.com/PMLavigne/kilight_client"
+repository = "https://github.com/PMLavigne/kilight-client"
 
 [project.optional-dependencies]
 tests = [
@@ -64,8 +64,8 @@ tag_name = "v{new_version}"
 
 [[tool.bumpversion.files]]
 filename = "README.md"
-search = "# kilight_client v{current_version}"
-replace = "# kilight_client v{new_version}"
+search = "# kilight-client v{current_version}"
+replace = "# kilight-client v{new_version}"
 
 [[tool.bumpversion.files]]
 filename = "src/kilight/client/__init__.py"

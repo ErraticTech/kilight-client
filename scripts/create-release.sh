@@ -9,7 +9,7 @@ fi
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)";
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")";
-VENV_PATHS=("$PROJECT_DIR/.venv" "$PROJECT_DIR/.venv/kilight_client");
+VENV_PATHS=("$PROJECT_DIR/.venv" "$PROJECT_DIR/.venv/kilight-client");
 
 VENV_FOUND=false;
 for venvPath in "${VENV_PATHS[@]}"; do
