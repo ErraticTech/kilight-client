@@ -41,7 +41,7 @@ class OutputState:
             warm_white=protocol_output_state.color.warmWhite,
             brightness=protocol_output_state.brightness,
             power_on=protocol_output_state.on,
-            current=protocol_output_state.current / 100,
+            current=protocol_output_state.current / 1000,
             temperature=temperature_state
         )
 
@@ -102,3 +102,11 @@ class DeviceState:
 
     fan_speed: int | None = None
     fan_drive_percentage: float | None = None
+
+
+@dataclass(frozen=True)
+class DiscoveredDeviceInfo:
+    name: str
+    hostname: str
+    port: int | None
+    hardware_id: str | None

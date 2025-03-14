@@ -13,8 +13,8 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class Device:
-    def __init__(self, host: str, port: int = DEFAULT_PORT):
-        self._connector: Connector = Connector(host, port)
+    def __init__(self, host: str, port: int = DEFAULT_PORT, **kwargs):
+        self._connector: Connector = Connector(host, port, **kwargs)
         self._state: DeviceState = DeviceState()
         self._callbacks: list[Callable[[DeviceState], None]] = []
 
@@ -32,6 +32,9 @@ class Device:
             return f"KiLight at {self.connector.host}:{self.connector.port}"
         return self.state.model
 
+    async def open_connection(self):
+        await self.connector.open_connection()
+
     async def disconnect(self):
         await self.connector.disconnect()
 
@@ -44,6 +47,7 @@ class Device:
 
         _LOGGER.debug("Reading state...")
         self._state = await self.connector.read_state(self.state)
+        _LOGGER.debug("%s State: %s", self.name, self.state)
         self._fire_callbacks()
 
     async def write_output(self, output: OutputIdentifier, **output_fields_to_update):
@@ -55,8 +59,12 @@ class Device:
             return
 
         updated_output = replace(updated_output, **output_fields_to_update)
-        _LOGGER.debug("Writing Output %s...", output.name)
+        _LOGGER.debug("%s Set Output %s = %s...",
+                      self.name,
+                      OutputIdentifier.Name(output),
+                      updated_output)
         self._state = await self.connector.write_update_and_read_state(self._state, output, updated_output)
+        _LOGGER.debug("%s State Updated: %s", self.name, self.state)
         self._fire_callbacks()
 
     async def update_output_from_parts(self, output: OutputIdentifier, **kwargs):
@@ -71,7 +79,7 @@ class Device:
             rgbcw_color: tuple[int, int, int, int, int] = kwargs['rgbcw_color']
             _LOGGER.debug("%s Output %s: Set rgbcw_color: %s",
                           self.name,
-                          output.name,
+                          OutputIdentifier.Name(output),
                           rgbcw_color)
             updated_output = replace(updated_output,
                                       red=rgbcw_color[0],
@@ -84,7 +92,7 @@ class Device:
             color_temp: int = kwargs['color_temp']
             _LOGGER.debug("%s Output %s: Set color_temp: %s",
                           self.name,
-                          output.name,
+                          OutputIdentifier.Name(output),
                           color_temp)
             white_levels: WhiteLevels = color_temp_to_white_levels(color_temp)
             updated_output = replace(updated_output,
@@ -98,7 +106,7 @@ class Device:
             brightness: int = kwargs['brightness']
             _LOGGER.debug("%s Output %s: Set brightness: %s",
                           self.name,
-                          output.name,
+                          OutputIdentifier.Name(output),
                           brightness)
             updated_output = replace(updated_output, brightness=brightness)
 
@@ -106,11 +114,12 @@ class Device:
             power_on: bool = kwargs['power_on']
             _LOGGER.debug("%s Output %s: Set power_on: %s",
                           self.name,
-                          output.name,
+                          OutputIdentifier.Name(output),
                           power_on)
             updated_output = replace(updated_output, power_on=power_on)
 
         self._state = await self.connector.write_update_and_read_state(self._state, output, updated_output)
+        _LOGGER.debug("%s State Updated: %s", self.name, self.state)
         self._fire_callbacks()
 
     def register_callback(self, callback: Callable[[DeviceState], None]) -> Callable[[], None]:

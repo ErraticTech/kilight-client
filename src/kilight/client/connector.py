@@ -18,6 +18,8 @@ from dataclasses import replace
 from typing import Any, TypeVar, Coroutine
 
 from kilight.protocol import GetData, Request, Response, CommandResult, OutputIdentifier
+from .const import DEFAULT_CONNECTION_TIMEOUT, DEFAULT_REQUEST_TIMEOUT, DEFAULT_RESPONSE_TIMEOUT
+from .exceptions import ConnectionTimeoutError, ResponseTimeoutError, RequestTimeoutError, NetworkTimeoutError
 from .models import DeviceState, OutputState, TemperatureState, VersionInfo
 
 _LOGGER = logging.getLogger(__name__)
@@ -57,9 +59,12 @@ class NotifyingProtocol(StreamReaderProtocol):
 
 
 class Connector:
-    def __init__(self, host: str, port: int):
+    def __init__(self, host: str, port: int, **kwargs):
         self._host: str = host
         self._port: int = port
+        self._connection_timeout: int = int(kwargs.get("connection_timeout", DEFAULT_CONNECTION_TIMEOUT))
+        self._request_timeout: int = int(kwargs.get("request_timeout", DEFAULT_REQUEST_TIMEOUT))
+        self._response_timeout: int = int(kwargs.get("response_timeout", DEFAULT_RESPONSE_TIMEOUT))
         self._operation_lock = Lock()
         self._reader: StreamReader | None = None
         self._writer: StreamWriter | None = None
@@ -73,38 +78,58 @@ class Connector:
     def port(self) -> int:
         return self._port
 
+    @property
+    def connection_timeout(self) -> int:
+        return self._connection_timeout
+
+    @property
+    def request_timeout(self) -> int:
+        return self._request_timeout
+
+    @property
+    def response_timeout(self) -> int:
+        return self._response_timeout
+
     async def disconnect(self):
         if self._writer:
             self._writer.close()
             await self._writer.wait_closed()
 
-    @staticmethod
-    async def _send_request(request: Request, writer: StreamWriter) -> None:
-        writer.write(struct.pack("<B", request.ByteSize()))
-        writer.write(request.SerializeToString())
-        await writer.drain()
+    async def _send_request(self, request: Request, writer: StreamWriter) -> None:
+        try:
+            writer.write(struct.pack("<B", request.ByteSize()))
+            writer.write(request.SerializeToString())
+            await wait_for(writer.drain(), timeout=self.request_timeout)
+        except TimeoutError:
+            raise RequestTimeoutError(self.host, self.port, self.response_timeout)
 
-    @staticmethod
-    async def _read_response(reader: StreamReader) -> Response:
-        length: int = struct.unpack("<B", await reader.readexactly(1))[0]
+    async def _read_response(self, reader: StreamReader) -> Response:
+
+        try:
+            length: int = struct.unpack("<B", await wait_for(reader.readexactly(1), timeout=self.response_timeout))[0]
+        except TimeoutError:
+            raise ResponseTimeoutError(self.host, self.port, self.response_timeout)
 
         if length <= 0:
             raise ValueError("Received invalid message length of zero")
 
         response = Response()
-        response.ParseFromString(await reader.readexactly(length))
+        try:
+            response.ParseFromString(await wait_for(reader.readexactly(length), timeout=self.response_timeout))
+        except TimeoutError:
+            raise ResponseTimeoutError(self.host, self.port, self.response_timeout)
         return response
 
-    @staticmethod
-    async def _request_and_parse_state[DataClassReturnT: DeviceState](state_to_update: DataClassReturnT,
+    async def _request_and_parse_state[DataClassReturnT: DeviceState](self,
+                                                                      state_to_update: DataClassReturnT,
                                                                       reader: StreamReader,
                                                                       writer: StreamWriter) -> DataClassReturnT:
         _LOGGER.debug("Requesting state info...")
         request = Request(getData=GetData.GetSystemState)
-        await Connector._send_request(request, writer)
+        await self._send_request(request, writer)
 
         _LOGGER.debug("Reading state message...")
-        response = await Connector._read_response(reader)
+        response = await self._read_response(reader)
 
         if not response.HasField("systemState"):
             raise ValueError(f"Unexpected message received instead of systemState: {response}")
@@ -132,16 +157,16 @@ class Connector:
                        fan_drive_percentage=response.systemState.fan.outputPerThou / 10
                        )
 
-    @staticmethod
-    async def _request_and_parse_system_info[DataClassReturnT: DeviceState](state_to_update: DataClassReturnT,
+    async def _request_and_parse_system_info[DataClassReturnT: DeviceState](self,
+                                                                            state_to_update: DataClassReturnT,
                                                                             reader: StreamReader,
                                                                             writer: StreamWriter) -> DataClassReturnT:
         _LOGGER.debug("Requesting system info...")
         request = Request(getData=GetData.GetSystemInfo)
-        await Connector._send_request(request, writer)
+        await self._send_request(request, writer)
 
         _LOGGER.debug("Reading system info message...")
-        response = await Connector._read_response(reader)
+        response = await self._read_response(reader)
 
         if not response.HasField("systemInfo"):
             raise ValueError(f"Unexpected message received instead of systemInfo: {response}")
@@ -156,17 +181,17 @@ class Connector:
                        hardware_version=VersionInfo.from_protocol(response.systemInfo.hardwareVersion)
                        )
 
-    @staticmethod
-    async def _write_output_update(output_id: OutputIdentifier,
+    async def _write_output_update(self,
+                                   output_id: OutputIdentifier,
                                    write_state: OutputState,
                                    reader: StreamReader,
                                    writer: StreamWriter) -> bool:
         _LOGGER.debug("Sending write request...")
         request = Request(writeOutput=write_state.to_protocol(output_id))
-        await Connector._send_request(request, writer)
+        await self._send_request(request, writer)
 
         _LOGGER.debug("Reading write request command response...")
-        response: Response = await Connector._read_response(reader)
+        response: Response = await self._read_response(reader)
 
         if not response.HasField("commandResult"):
             raise ValueError(f"Unexpected message received instead of commandResult: {response}")
@@ -178,7 +203,7 @@ class Connector:
         _LOGGER.debug("Write request OK")
         return True
 
-    async def _open_connection(self):
+    async def open_connection(self):
         _LOGGER.debug("Connecting to %s:%s...", self.host, self.port)
 
         async def on_disconnected():
@@ -189,41 +214,45 @@ class Connector:
                 self._protocol = None
 
         loop = events.get_running_loop()
-        transport, protocol = await loop.create_connection(
-            lambda: NotifyingProtocol(on_disconnected_callback=on_disconnected, loop=loop),
-            self.host,
-            self.port)
+        try:
+            transport, protocol = await wait_for(loop.create_connection(
+                lambda: NotifyingProtocol(on_disconnected_callback=on_disconnected, loop=loop),
+                self.host,
+                self.port),
+                timeout=self.connection_timeout)
 
-        self._protocol = protocol
-        self._reader = self._protocol.reader
-        self._writer = StreamWriter(transport, self._protocol, self._reader, loop)
-        _LOGGER.debug("Connected.")
+            self._protocol = protocol
+            self._reader = self._protocol.reader
+            self._writer = StreamWriter(transport, self._protocol, self._reader, loop)
+            _LOGGER.debug("Connected.")
+        except TimeoutError:
+            raise ConnectionTimeoutError(self.host, self.port, self.connection_timeout)
 
     async def _connect_and_run(self, lambda_to_run: ConnectedCallbackT) -> ReturnT:
         async def wrapper():
             async with self._operation_lock:
                 if self._protocol is None:
-                    await self._open_connection()
+                    await self.open_connection()
 
                 return await lambda_to_run(self._reader, self._writer)
 
         try:
-            return await wait_for(wrapper(), 30)
-        except TimeoutError as err:
-            _LOGGER.error("Connection timed out")
+            return await wrapper()
+        except NetworkTimeoutError as err:
+            _LOGGER.error("Operation timed out")
             await self.disconnect()
             raise err
 
     async def read_state(self, state_to_update: DeviceState) -> DeviceState:
         async def wrapper(reader: StreamReader, writer: StreamWriter) -> ReturnT:
-            return await Connector._request_and_parse_state(state_to_update, reader, writer)
+            return await self._request_and_parse_state(state_to_update, reader, writer)
 
         return await self._connect_and_run(wrapper)
 
     async def read_system_info_and_state(self, state_to_update: DeviceState) -> DeviceState:
         async def wrapper(reader: StreamReader, writer: StreamWriter) -> DeviceState:
-            working_state = await Connector._request_and_parse_system_info(state_to_update, reader, writer)
-            return await Connector._request_and_parse_state(working_state, reader, writer)
+            working_state = await self._request_and_parse_system_info(state_to_update, reader, writer)
+            return await self._request_and_parse_state(working_state, reader, writer)
 
         return await self._connect_and_run(wrapper)
 
@@ -231,7 +260,7 @@ class Connector:
                            output_id: OutputIdentifier,
                            output_state: OutputState) -> None:
         async def write_wrapper(reader: StreamReader, writer: StreamWriter):
-            await Connector._write_output_update(output_id, output_state, reader, writer)
+            await self._write_output_update(output_id, output_state, reader, writer)
 
         await self._connect_and_run(write_wrapper)
 
@@ -240,8 +269,8 @@ class Connector:
                                           output_id: OutputIdentifier,
                                           output_state: OutputState) -> DeviceState:
         async def write_wrapper(reader: StreamReader, writer: StreamWriter):
-            await Connector._write_output_update(output_id, output_state, reader, writer)
+            await self._write_output_update(output_id, output_state, reader, writer)
             await sleep(0.1)
-            return await Connector._request_and_parse_state(state_to_update, reader, writer)
+            return await self._request_and_parse_state(state_to_update, reader, writer)
 
         return await self._connect_and_run(write_wrapper)

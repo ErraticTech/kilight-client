@@ -1,5 +1,6 @@
 [project]
 name = "kilight_client"
+version = "0.1.0"
 authors = [
     {name = "Patrick Lavigne", email = "me@patrick.codes"},
 ]
@@ -12,9 +13,10 @@ classifiers = [
     "Environment :: Console"
 ]
 dependencies = [
-    "protobuf>=5.27.1,<6"
+    "protobuf>=5.27.1,<6",
+    "zeroconf"
 ]
-dynamic = ["version", "readme"]
+dynamic = ["readme"]
 
 [project.urls]
 repository = "https://github.com/PMLavigne/kilight_client"
@@ -25,11 +27,15 @@ tests = [
     "pytest-asyncio"
 ]
 
+[project.scripts]
+kilight = "kilight.client.cli:entrypoint"
+
 [build-system]
 requires = [
     "setuptools",
     "setuptools-scm",
-    "grpcio-tools"
+    "grpcio-tools",
+    "bump-my-version"
 ]
 build-backend = "setuptools.build_meta"
 
@@ -37,8 +43,10 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.dynamic]
-version = {attr = "kilight.client.__version__"}
 readme = {file = ["README.md"]}
+
+[tool.setuptools.package-data]
+"kilight.client.cli" = ["src/kilight/client/cli/config/*.ini"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
@@ -47,3 +55,19 @@ log_cli_level = "DEBUG"
 log_cli_format = "%(asctime)s.%(msecs)03d [%(levelname)8s] %(message)s"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 asyncio_default_fixture_loop_scope = "function"
+
+[tool.bumpversion]
+commit = true
+tag = false
+sign_tags = false
+tag_name = "v{new_version}"
+
+[[tool.bumpversion.files]]
+filename = "README.md"
+search = "# kilight_client v{current_version}"
+replace = "# kilight_client v{new_version}"
+
+[[tool.bumpversion.files]]
+filename = "src/kilight/client/__init__.py"
+search = "__version__ = \"{current_version}\""
+replace = "__version__ = \"{new_version}\""
