@@ -26,6 +26,9 @@ tests = [
     "pytest",
     "pytest-asyncio"
 ]
+release = [
+    "bump-my-version"
+]
 
 [project.scripts]
 kilight = "kilight.client.cli:entrypoint"
@@ -34,13 +37,13 @@ kilight = "kilight.client.cli:entrypoint"
 requires = [
     "setuptools",
     "setuptools-scm",
-    "grpcio-tools",
-    "bump-my-version"
+    "grpcio-tools"
 ]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+exclude = [".idea/*", "scripts/*", "tests/*", "*.proto"]
 
 [tool.setuptools.dynamic]
 readme = {file = ["README.md"]}
