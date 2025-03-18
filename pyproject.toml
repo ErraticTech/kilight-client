@@ -61,9 +61,10 @@ asyncio_default_fixture_loop_scope = "function"
 
 [tool.bumpversion]
 commit = true
-tag = false
+tag = true
 sign_tags = false
 tag_name = "v{new_version}"
+tag_message = "Bump version: {current_version} → {new_version}"
 
 [[tool.bumpversion.files]]
 filename = "README.md"
