@@ -1,4 +1,4 @@
-# kilight-client v0.2.0
+# kilight-client v0.3.0
 Python client library for communicating with KiLight devices.
 
 ## What is this?
