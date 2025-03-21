@@ -31,8 +31,8 @@ NEW_VERSION="$(bump-my-version show --increment "$VERSION_BUMP_PART" new_version
 
 echo "Bumping $VERSION_BUMP_PART version from $OLD_VERSION to $NEW_VERSION";
 
+git flow release start "$NEW_VERSION";
+
 bump-my-version bump "$VERSION_BUMP_PART";
 
-echo "Pushing everything...";
-
-git push --atomic --follow-tags origin main
+git flow release finish -sSp "$NEW_VERSION";
