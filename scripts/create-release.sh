@@ -35,4 +35,8 @@ git flow release start "$NEW_VERSION";
 
 bump-my-version bump "$VERSION_BUMP_PART";
 
-git flow release finish -sp "$NEW_VERSION";
+git flow release finish -s "$NEW_VERSION";
+
+echo "Pushing everything...";
+
+git push --atomic --follow-tags origin main develop
