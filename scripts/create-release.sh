@@ -35,4 +35,4 @@ git flow release start "$NEW_VERSION";
 
 bump-my-version bump "$VERSION_BUMP_PART";
 
-git flow release finish -sSp "$NEW_VERSION";
+git flow release finish -sp "$NEW_VERSION";
