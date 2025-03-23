@@ -15,7 +15,7 @@ from asyncio import (StreamReaderProtocol,
 
 from collections.abc import Callable
 from dataclasses import replace
-from typing import Any, TypeVar, Coroutine
+from typing import Any, Coroutine
 
 from kilight.protocol import GetData, Request, Response, CommandResult, OutputIdentifier
 from .const import DEFAULT_CONNECTION_TIMEOUT, DEFAULT_REQUEST_TIMEOUT, DEFAULT_RESPONSE_TIMEOUT
@@ -23,10 +23,6 @@ from .exceptions import ConnectionTimeoutError, ResponseTimeoutError, RequestTim
 from .models import DeviceState, OutputState, TemperatureState, VersionInfo
 
 _LOGGER = logging.getLogger(__name__)
-
-ReturnT = TypeVar("ReturnT")
-ConnectedCallbackT = Callable[[StreamReader, StreamWriter], Coroutine[Any, Any, ReturnT]]
-
 
 class NotifyingProtocol(StreamReaderProtocol):
 
@@ -228,23 +224,22 @@ class Connector:
         except TimeoutError:
             raise ConnectionTimeoutError(self.host, self.port, self.connection_timeout)
 
-    async def _connect_and_run(self, lambda_to_run: ConnectedCallbackT) -> ReturnT:
-        async def wrapper():
+    async def _connect_and_run[ReturnT](self,
+                                        lambda_to_run: Callable[[StreamReader, StreamWriter],
+                                                                Coroutine[Any, Any, ReturnT]]) -> ReturnT:
+        try:
             async with self._operation_lock:
                 if self._protocol is None:
                     await self.open_connection()
 
                 return await lambda_to_run(self._reader, self._writer)
-
-        try:
-            return await wrapper()
         except NetworkTimeoutError as err:
             _LOGGER.error("Operation timed out")
             await self.disconnect()
             raise err
 
     async def read_state(self, state_to_update: DeviceState) -> DeviceState:
-        async def wrapper(reader: StreamReader, writer: StreamWriter) -> ReturnT:
+        async def wrapper(reader: StreamReader, writer: StreamWriter) -> DeviceState:
             return await self._request_and_parse_state(state_to_update, reader, writer)
 
         return await self._connect_and_run(wrapper)

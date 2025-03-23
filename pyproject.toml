@@ -1,13 +1,13 @@
 [project]
 name = "kilight-client"
-version = "0.3.4"
+version = "0.3.5"
+license = "GPL-3.0-or-later"
 authors = [
     {name = "Patrick Lavigne", email = "me@patrick.codes"},
 ]
 description = "Client library for communicating with KiLight devices."
 requires-python = ">= 3.12"
 classifiers = [
-    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Topic :: Home Automation",
     "Development Status :: 2 - Pre-Alpha",
     "Environment :: Console"
@@ -19,7 +19,7 @@ dependencies = [
 dynamic = ["readme"]
 
 [project.urls]
-repository = "https://github.com/PMLavigne/kilight-client"
+repository = "https://github.com/ErraticTech/kilight-client"
 
 [project.optional-dependencies]
 tests = [
