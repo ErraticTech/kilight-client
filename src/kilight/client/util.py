@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+from kilight.protocol import OutputIdentifier
 from .const import MIN_COLOR_TEMP, MAX_COLOR_TEMP
 from .types import WhiteLevels
 
@@ -33,3 +34,15 @@ def white_levels_to_color_temp(warm_white: int,
     else:
         temperature = ((cold / total_brightness) * (max_temp - min_temp)) + min_temp
     return round(temperature)
+
+class OutputIdUtil:
+    @staticmethod
+    def letter(output_identifier: OutputIdentifier | None) -> str:
+        if output_identifier == OutputIdentifier.Invalid:
+            return "Invalid"
+        elif output_identifier == OutputIdentifier.OutputA:
+            return "A"
+        elif output_identifier == OutputIdentifier.OutputB:
+            return "B"
+        else:
+            return "Unknown"

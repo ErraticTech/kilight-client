@@ -13,7 +13,9 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class Device:
-    def __init__(self, host: str, port: int = DEFAULT_PORT, **kwargs):
+    def __init__(self, host: str, port: int | None = DEFAULT_PORT, **kwargs):
+        if port is None:
+            port = DEFAULT_PORT
         self._connector: Connector = Connector(host, port, **kwargs)
         self._state: DeviceState = DeviceState()
         self._callbacks: list[Callable[[DeviceState], None]] = []
