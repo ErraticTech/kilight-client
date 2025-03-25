@@ -1,6 +1,6 @@
 """kilight.client package for interfacing with KiLight open hardware light controllers."""
 
-__version__ = "0.3.5"
+__version__ = "0.4.0"
 
 __all__ = [
     "DEFAULT_PORT",
